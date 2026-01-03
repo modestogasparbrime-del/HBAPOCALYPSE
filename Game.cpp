@@ -5,6 +5,7 @@
 
 #include "Game.h"
 #include "lan_eng.h"
+#include "ModernEngine.h"
 
 
 extern char G_cSpriteAlphaDegree;
@@ -837,6 +838,10 @@ void CGame::Quit()
 	for (i = 0; i < DEF_MAXITEMNAMES; i++)
 		if (m_pItemNameList[i] != 0) delete m_pItemNameList[i];
 
+	// Cleanup MobKillCount (memory leak fix)
+	for (i = 0; i < 100; i++)
+		if (m_pMobKillCount[i] != 0) delete m_pMobKillCount[i];
+
 	delete m_pMapData;
 
 	if (m_pGSock != 0) delete m_pGSock;
@@ -847,7 +852,10 @@ void CGame::Quit()
 
 
 void CGame::UpdateScreen()
-{ 	G_dwGlobalTime = timeGetTime();
+{ 	
+	// Use high-precision timer for more accurate timing on modern systems
+	G_dwGlobalTime = GetHighPrecisionTime();
+	
 	switch (m_cGameMode) {
 #ifdef DEF_MAKE_ACCOUNT
 	case DEF_GAMEMODE_ONAGREEMENT:
@@ -29583,6 +29591,17 @@ bool CGame::bCheckLocalChatCommand(char * pMsg)
 		else m_bShowFPS = true;
 		return true;
 	}
+	// Toggle smooth scaling (reduces pixelation)
+	if (memcmp(cBuff, "/smooth", 7)==0)
+	{	if(m_DDraw.m_bSmoothScaling) {
+			m_DDraw.m_bSmoothScaling = false;
+			AddEventList("Smooth scaling: OFF (pixelated)", 10);
+		} else {
+			m_DDraw.m_bSmoothScaling = true;
+			AddEventList("Smooth scaling: ON (bilinear)", 10);
+		}
+		return true;
+	}
 	if (memcmp(cBuff, "/enabletogglescreen", 19)==0)
 	{	m_bToggleScreen = true;
 		return true;
@@ -30363,7 +30382,8 @@ void CGame::UpdateScreen_OnGame()
  char cLB, cRB;
  char cItemColor;
  int  i, iAmount;
- DWORD dwTime = timeGetTime();
+ // Use high-precision timer for accurate timing
+ DWORD dwTime = GetHighPrecisionTime();
  static DWORD dwPrevChatTime = 0;
  static int   imX = 0, imY = 0;
 
@@ -30796,19 +30816,21 @@ void CGame::UpdateScreen_OnGame()
 	}
 	else m_pSprite[DEF_SPRID_MOUSECURSOR]->PutSpriteFast(msX, msY, m_stMCursor.sCursorFrame, dwTime);
 
-	if( iUpdateRet == 0 ) m_sFrameCount++;
-	else m_sFrameCount+=256;
+	// Count every frame for FPS calculation (don't use the +=256 trick)
+	m_sFrameCount++;
 
-	if( dwTime - m_dwFPStime > 1000 )
-	{	m_dwFPStime = dwTime;
-		m_sFPS = m_sFrameCount>>7;
-		if( m_sFPS < 10 ) m_sFPS += 6;
+	// Update FPS display every second
+	if( dwTime - m_dwFPStime >= 1000 )
+	{
+		// Use actual frame count from this second
+		m_sFPS = m_sFrameCount;
 		m_sFrameCount = 0;
+		m_dwFPStime = dwTime;
 	}
 
 	if( iUpdateRet != 0 )
 	{	if( m_bShowFPS )
-		{	wsprintf( G_cTxt, "fps : %d", m_sFPS );
+		{	wsprintf( G_cTxt, "FPS: %d / %dHz", m_sFPS, g_FPSLimiter.GetTargetFPS() );
 			PutString( 10, 100, G_cTxt, RGB(255,255,255) );
 		}
 		if( m_DDraw.iFlip() == DDERR_SURFACELOST ) RestoreSprites();

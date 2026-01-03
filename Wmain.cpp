@@ -3,6 +3,9 @@
 //
 //                      1998.10 by Soph
 //
+//         Modernized for Windows 10/11 compatibility
+//         High-precision timing and FPS limiter added
+//
 // --------------------------------------------------------------
 
 
@@ -18,6 +21,7 @@
 #include "winmain.h"
 #include "Game.h"
 #include "GlobalDef.h"
+#include "ModernEngine.h"
 
 extern "C" __declspec( dllimport) int __FindHackingDll__(char *);
 
@@ -154,6 +158,9 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
  char cSearchDll[] = "rd`qbg-ckk";
  char cRealName[12];
 
+	// Initialize modern engine systems (DPI awareness, priority, etc.)
+	InitializeModernEngine();
+
 	srand((unsigned)time(0));
 	char *pJammer = new char[(rand() % 100) +1];
 	G_pGame = new class CGame;
@@ -204,6 +211,9 @@ int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	CloseHandle(hMutex);
 #endif
 
+	// Cleanup modern engine systems
+	ShutdownModernEngine();
+
 	delete[] pJammer;
 	delete G_pGame;
 
@@ -253,17 +263,39 @@ bool InitInstance( HINSTANCE hInstance, int nCmdShow )
 
 
 void EventLoop()
-{ MSG msg;
-	while( true ) 
-	{	if( PeekMessage( &msg, 0, 0, 0, PM_NOREMOVE ) ) 
-		{	if( !GetMessage( &msg, 0, 0, 0 ) ) return;// msg.wParam;
+{ 
+    MSG msg;
+    
+    // Initialize high-precision timer for accurate frame timing
+    g_HighPrecisionTimer.Reset();
+    
+    while( true ) 
+    {
+        // Process all pending Windows messages first
+        while( PeekMessage( &msg, 0, 0, 0, PM_REMOVE ) ) 
+        {
+            if( msg.message == WM_QUIT ) return;
             TranslateMessage(&msg);
             DispatchMessage(&msg);
-		}
-		else if (G_pGame->m_bIsProgramActive) G_pGame->UpdateScreen();
-		else if (G_pGame->m_cGameMode == DEF_GAMEMODE_ONLOADING) G_pGame->UpdateScreen_OnLoading( false );
-		else WaitMessage();
-	}
+        }
+        
+        if (G_pGame->m_bIsProgramActive) 
+        {
+            // Wait for next frame (FPS limiter with CPU optimization)
+            g_FPSLimiter.WaitForNextFrame();
+            G_pGame->UpdateScreen();
+        }
+        else if (G_pGame->m_cGameMode == DEF_GAMEMODE_ONLOADING) 
+        {
+            G_pGame->UpdateScreen_OnLoading( false );
+        }
+        else 
+        {
+            // When inactive, use WaitMessage to minimize CPU usage
+            // But add a small timeout to remain responsive
+            MsgWaitForMultipleObjects(0, NULL, FALSE, 100, QS_ALLINPUT);
+        }
+    }
 }
 
 void OnDestroy()

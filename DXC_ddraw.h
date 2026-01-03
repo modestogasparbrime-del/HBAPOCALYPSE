@@ -80,6 +80,9 @@ public:
 	int res_y;
 	int res_x_mid;
 	int res_y_mid;
+	
+	// Smooth scaling option (reduces pixelation)
+	bool m_bSmoothScaling;
 };
 
 #endif // !defined(AFX_DXC_DDRAW_H__C52EBA83_6D9E_11D2_A8E6_00001C7030A6__INCLUDED_)

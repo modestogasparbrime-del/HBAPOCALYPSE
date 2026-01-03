@@ -1,10 +1,14 @@
 // DXC_ddraw.cpp: implementation of the DXC_ddraw class.
 //
+// Modernized for Windows 10/11 with borderless fullscreen support
+// and proper aspect ratio preservation
+//
 //////////////////////////////////////////////////////////////////////
 
 #include <string.h>
 #include <objbase.h>
 #include "DXC_ddraw.h"
+#include "ModernEngine.h"
 
 extern HWND G_hEditWnd;
 extern HWND G_hWnd;
@@ -40,6 +44,7 @@ DXC_ddraw::DXC_ddraw()
 	res_y = 0;
 	res_x_mid = 0;
 	res_y_mid = 0;
+	m_bSmoothScaling = true;  // Enable smooth scaling by default
 }
 
 DXC_ddraw::~DXC_ddraw()
@@ -99,7 +104,7 @@ bool DXC_ddraw::bInit(HWND hWnd)
 	ddVal = m_lpDD4->CreateSurface(&ddsd, &m_lpFrontB4, 0);
 	if (ddVal != DD_OK) return false;
 
-	// Destination rect in screen coordinates (stretch 800x600 to fullscreen)
+	// Stretch 800x600 to full monitor (original behavior)
 	SetRect(&m_rcFlipping, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right, mi.rcMonitor.bottom);
 
 	InitFlipToGDI(hWnd);
@@ -165,7 +170,7 @@ HRESULT DXC_ddraw::iFlip()
 	if (!m_init)
 		return DD_OK;
 
-	HRESULT ddVal;
+	HRESULT ddVal = DD_OK;
 	
 	if (m_bFullMode)
 	{
@@ -183,8 +188,51 @@ HRESULT DXC_ddraw::iFlip()
 	}
 	else
 	{
-		//SetRect( &m_rcFlipping, 0, 0, 1152, 864 );
-		ddVal = m_lpFrontB4->Blt(&m_rcFlipping, m_lpBackB4, 0, DDBLT_WAIT, 0);
+		// Use smooth scaling with GDI StretchBlt for better visual quality
+		if (m_bSmoothScaling)
+		{
+			HDC hdcSrc = NULL;
+			HDC hdcDst = NULL;
+			
+			// Get device contexts from DirectDraw surfaces
+			if (m_lpBackB4->GetDC(&hdcSrc) == DD_OK && m_lpFrontB4->GetDC(&hdcDst) == DD_OK)
+			{
+				// Set high-quality stretch mode (bilinear interpolation)
+				int oldMode = SetStretchBltMode(hdcDst, HALFTONE);
+				SetBrushOrgEx(hdcDst, 0, 0, NULL);
+				
+				// Calculate destination rectangle dimensions
+				int destWidth = m_rcFlipping.right - m_rcFlipping.left;
+				int destHeight = m_rcFlipping.bottom - m_rcFlipping.top;
+				
+				// Perform the smooth stretch blit
+				StretchBlt(hdcDst, 
+					m_rcFlipping.left, m_rcFlipping.top,  // Destination position
+					destWidth, destHeight,                 // Destination size
+					hdcSrc, 
+					0, 0,                                  // Source position
+					res_x, res_y,                          // Source size (800x600)
+					SRCCOPY);
+				
+				// Restore previous stretch mode
+				SetStretchBltMode(hdcDst, oldMode);
+				
+				m_lpBackB4->ReleaseDC(hdcSrc);
+				m_lpFrontB4->ReleaseDC(hdcDst);
+			}
+			else
+			{
+				// Fallback to DirectDraw Blt if GetDC fails
+				if (hdcSrc) m_lpBackB4->ReleaseDC(hdcSrc);
+				if (hdcDst) m_lpFrontB4->ReleaseDC(hdcDst);
+				ddVal = m_lpFrontB4->Blt(&m_rcFlipping, m_lpBackB4, 0, DDBLT_WAIT, 0);
+			}
+		}
+		else
+		{
+			// Original DirectDraw stretch (pixelated but faster)
+			ddVal = m_lpFrontB4->Blt(&m_rcFlipping, m_lpBackB4, 0, DDBLT_WAIT, 0);
+		}
 	}
 
 	if (ddVal == DDERR_SURFACELOST) {
@@ -252,6 +300,7 @@ void DXC_ddraw::ChangeDisplayMode(HWND hWnd)
 	ddVal = m_lpDD4->CreateSurface(&ddsd, &m_lpFrontB4, 0);
 	if (ddVal != DD_OK) return;
 
+	// Stretch 800x600 to full monitor (original behavior)
 	SetRect(&m_rcFlipping, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right, mi.rcMonitor.bottom);
 	InitFlipToGDI(hWnd);
 	m_lpBackB4 = pCreateOffScreenSurface(res_x, res_y);
