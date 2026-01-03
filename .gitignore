@@ -1,0 +1,29 @@
+# Visual Studio
+.vs/
+*.vcxproj.user
+*.suo
+*.user
+*.ncb
+*.opendb
+
+# Build outputs
+Release/
+Debug/
+Debug*/
+Release*/
+*.lib
+*.obj
+*.exe
+*.pdb
+
+# Generated files
+*.ilk
+*.sbr
+
+# Misc
+*.log
+resource.aps
+
+# OS
+Thumbs.db
+.DS_Store
