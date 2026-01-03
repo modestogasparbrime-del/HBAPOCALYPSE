@@ -8,13 +8,6 @@ Helbreath is a classic MMORPG (Massively Multiplayer Online Role-Playing Game) t
 
 HBAPOCALYPSE is a project dedicated to preserving and enhancing the Helbreath gaming experience. This repository aims to provide resources, documentation, and tools for the Helbreath community.
 
-## Features
-
-- **Classic Gameplay**: Experience the intense PvP combat that made Helbreath famous
-- **Faction Warfare**: Choose between Aresden and Elvine in epic battles
-- **Character Development**: Build your character through multiple classes and skills
-- **Community Driven**: Built by fans, for fans of the original game
-
 ## Game Features
 
 ### Core Gameplay Elements
@@ -46,7 +39,7 @@ This is a fan project. Helbreath and related trademarks are property of their re
 
 ## License
 
-Please refer to the LICENSE file for licensing information.
+This project is a community effort. License details to be determined.
 
 ## Community
 
